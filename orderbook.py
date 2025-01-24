@@ -8,6 +8,9 @@ from instrument import Instrument
 from order import Order, OrderType, OrderSide
 
 
+# Introduced to account for floating-point inaccuracy
+ERROR_TERM = 1e-9
+
 
 @dataclass
 class Trade:
@@ -83,7 +86,7 @@ class OrderBook:
             best_ask = self.asks[0]
 
             # For LIMIT, price must be >= best ask (the existing code checks MARKET vs. buy_order.price)
-            if (buy_order.order_type == OrderType.LIMIT) and (best_ask.price > buy_order.price):
+            if (buy_order.order_type == OrderType.LIMIT) and (best_ask.price - ERROR_TERM > buy_order.price):
                 break
 
             matched_amount = min(buy_order.amount, best_ask.amount)
@@ -121,7 +124,7 @@ class OrderBook:
         while sell_order.amount > 0 and self.bids:
             best_bid = self.bids[0]
 
-            if (sell_order.order_type == OrderType.LIMIT) and (best_bid.price < sell_order.price):
+            if (sell_order.order_type == OrderType.LIMIT) and (best_bid.price + ERROR_TERM < sell_order.price):
                 break
 
             matched_amount = min(sell_order.amount, best_bid.amount)
