@@ -1,5 +1,5 @@
 from typing import Deque
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import deque
 
 from trade import Trade
@@ -202,3 +202,10 @@ class OrderBook:
 
     def get_midprice(self) -> float:
         return 0.5 * (self.bids[0].price + self.asks[0].price)
+
+    def remove_stale_quotes(self, current_time: datetime, lifetime_seconds: int) -> None:
+        """
+        Removes quotes from the orderbook older than `lifetime_seconds`
+        """
+        self.bids = [order for order in self.bids if order.timestamp > current_time - timedelta(seconds=lifetime_seconds)]
+        self.asks = [order for order in self.asks if order.timestamp > current_time - timedelta(seconds=lifetime_seconds)]
