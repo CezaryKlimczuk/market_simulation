@@ -29,8 +29,9 @@ class OrderBook:
 
     def __init__(self, instrument: Instrument) -> None:
         self.instrument: Instrument = instrument
-        self.bids: Deque[tuple[float, datetime, Order]] = deque()
-        self.asks: Deque[tuple[float, datetime, Order]] = deque()
+        # Storing Order objects within bids and asks queues
+        self.bids: Deque[Order] = deque()
+        self.asks: Deque[Order] = deque()
         self.trades: list[Trade] = []
 
     def add_order(self, incoming_order: Order) -> list[Trade]:
@@ -50,13 +51,13 @@ class OrderBook:
         trades: list[Trade] = []
         # MARKET buy => check liquidity first
         if buy_order.order_type == OrderType.MARKET:
-            if not self._has_sufficient_liquidity(buy_order, side="ASK"):
-                return trades  # reject if no sufficient volume
+            if not self._has_sufficient_liquidity(buy_order, side=OrderSide.BUY):
+                return trades  # insufficient volume => reject
 
         trades = self._execute_buy_matches(buy_order)
 
         # Insert leftover LIMIT buy
-        if buy_order.amount > 0 and buy_order.order_type == OrderType.LIMIT:
+        if (buy_order.amount > 0) and (buy_order.order_type == OrderType.LIMIT):
             self._insert_bid(buy_order)
 
         return trades
@@ -65,13 +66,13 @@ class OrderBook:
         trades: list[Trade] = []
         # MARKET sell => check liquidity
         if sell_order.order_type == OrderType.MARKET:
-            if not self._has_sufficient_liquidity(sell_order, side="BID"):
-                return trades
+            if not self._has_sufficient_liquidity(sell_order, side=OrderSide.SELL):
+                return trades # insufficient volume => reject
 
         trades = self._execute_sell_matches(sell_order)
 
         # Insert leftover LIMIT sell
-        if sell_order.amount > 0 and sell_order.order_type == OrderType.LIMIT:
+        if (sell_order.amount > 0) and (sell_order.order_type == OrderType.LIMIT):
             self._insert_ask(sell_order)
 
         return trades
@@ -79,34 +80,36 @@ class OrderBook:
     def _execute_buy_matches(self, buy_order: Order) -> list[Trade]:
         trades: list[Trade] = []
         while buy_order.amount > 0 and self.asks:
-            best_ask_price, ask_arrival_time, ask_order = self.asks[0]
+            best_ask = self.asks[0]
 
-            # For LIMIT, price must be >= best ask
-            if (buy_order.order_type == OrderType.MARKET
-                    and best_ask_price > (buy_order.price or 0)):
+            # For LIMIT, price must be >= best ask (the existing code checks MARKET vs. buy_order.price)
+            if (buy_order.order_type == OrderType.LIMIT) and (best_ask.price > buy_order.price):
                 break
 
-            matched_amount = min(buy_order.amount, ask_order.amount)
-            execution_price = best_ask_price
+            matched_amount = min(buy_order.amount, best_ask.amount)
+            execution_price = best_ask.price
 
             new_trade = Trade(
                 buy_order_id=buy_order.id,
-                sell_order_id=ask_order.id,
+                sell_order_id=best_ask.id,
                 instrument_code=self.instrument.code,
                 price=execution_price,
                 amount=matched_amount,
                 timestamp=datetime.now()
             )
+            
+            # Recording the trades in the global scope 
             self.trades.append(new_trade)
             trades.append(new_trade)
 
             buy_order.amount -= matched_amount
-            ask_order.amount -= matched_amount
+            best_ask.amount -= matched_amount
 
-            if ask_order.amount == 0:
+            # If the best ask is fully filled, pop it. Otherwise update its remaining amount in place.
+            if best_ask.amount == 0:
                 self.asks.popleft()
             else:
-                self.asks[0] = (best_ask_price, ask_arrival_time, ask_order)
+                self.asks[0] = best_ask
 
             if buy_order.amount == 0:
                 break
@@ -116,33 +119,34 @@ class OrderBook:
     def _execute_sell_matches(self, sell_order: Order) -> list[Trade]:
         trades: list[Trade] = []
         while sell_order.amount > 0 and self.bids:
-            best_bid_price, bid_arrival_time, bid_order = self.bids[0]
+            best_bid = self.bids[0]
 
-            if (sell_order.order_type == OrderType.LIMIT
-                    and best_bid_price < (sell_order.price or 0)):
+            if (sell_order.order_type == OrderType.LIMIT) and (best_bid.price < sell_order.price):
                 break
 
-            matched_amount = min(sell_order.amount, bid_order.amount)
-            execution_price = best_bid_price
+            matched_amount = min(sell_order.amount, best_bid.amount)
+            execution_price = best_bid.price
 
             new_trade = Trade(
-                buy_order_id=bid_order.id,
+                buy_order_id=best_bid.id,
                 sell_order_id=sell_order.id,
                 instrument_code=self.instrument.code,
                 price=execution_price,
                 amount=matched_amount,
                 timestamp=datetime.now()
             )
+
+            # Recording the trades in the global scope 
             self.trades.append(new_trade)
             trades.append(new_trade)
 
             sell_order.amount -= matched_amount
-            bid_order.amount -= matched_amount
+            best_bid.amount -= matched_amount
 
-            if bid_order.amount == 0:
+            if best_bid.amount == 0:
                 self.bids.popleft()
             else:
-                self.bids[0] = (best_bid_price, bid_arrival_time, bid_order)
+                self.bids[0] = best_bid
 
             if sell_order.amount == 0:
                 break
@@ -150,51 +154,46 @@ class OrderBook:
         return trades
 
     def _insert_bid(self, order: Order) -> None:
-        entry: tuple[float, datetime, Order] = (order.price or 0.0, order.timestamp or datetime.now(), order)
-        inserted: bool = False
-
-        for i, (price, arr_time, existing) in enumerate(self.bids):
-            # Higher price => earlier in the list
-            if price < order.price:
-                self.bids.insert(i, entry)
+        # Higher price => earlier in the list, tie -> FIFO
+        inserted = False
+        for i, existing_order in enumerate(self.bids):
+            if existing_order.price < (order.price or 0.0):
+                self.bids.insert(i, order)
                 inserted = True
                 break
-            # If prices tie, we proceed to insert behind them (FIFO)
         if not inserted:
-            self.bids.append(entry)
+            self.bids.append(order)
 
     def _insert_ask(self, order: Order) -> None:
-        entry: tuple[float, datetime, Order] = (order.price or 0.0, order.timestamp or datetime.now(), order)
-        inserted: bool = False
-
-        for i, (price, arr_time, existing) in enumerate(self.asks):
-            if price > order.price:
-                self.asks.insert(i, entry)
+        # Lower price => earlier in the list, tie -> FIFO
+        inserted = False
+        for i, existing_order in enumerate(self.asks):
+            if existing_order.price > (order.price or 0.0):
+                self.asks.insert(i, order)
                 inserted = True
                 break
-            # If same price, keep FIFO
         if not inserted:
-            self.asks.append(entry)
+            self.asks.append(order)
 
     def _has_sufficient_liquidity(self, incoming_order: Order, side: str) -> bool:
-        total_liquidity: int = 0
-        needed: int = incoming_order.amount
+        total_liquidity = 0
+        needed = incoming_order.amount
 
-        if side == "ASK":
-            for (ask_price, arr_time, ask_order) in self.asks:
+        if side == OrderSide.BUY:
+            for ask_order in self.asks:
                 total_liquidity += ask_order.amount
                 if total_liquidity >= needed:
                     return True
-        else:  # side == "BID"
-            for (bid_price, arr_time, bid_order) in self.bids:
+        elif side == OrderSide.SELL:
+            for bid_order in self.bids:
                 total_liquidity += bid_order.amount
                 if total_liquidity >= needed:
                     return True
 
         return False
 
-    def get_best_bid(self) -> tuple[float, datetime, Order] | None:
+    def get_best_bid(self) -> Order:
         return self.bids[0] if self.bids else None
 
-    def get_best_ask(self) -> tuple[float, datetime, Order] | None:
+    def get_best_ask(self) -> Order:
         return self.asks[0] if self.asks else None
