@@ -11,7 +11,7 @@ from instrument import Instrument
 
 def _round_up(x, a):
     # Rounds x up to the nearest multiple of a
-    return np.ceil(x / a) * a
+    return float(np.ceil(x / a) * a)
 
 class OrderSide(Enum):
     BUY = 1
