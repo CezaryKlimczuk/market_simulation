@@ -12,18 +12,6 @@ from order import Order, OrderType, OrderSide
 ERROR_TERM = 1e-9
 
 
-@dataclass
-class Trade:
-    """
-    Represents an executed match between one buy order and one sell order.
-    """
-    buy_order_id: int
-    sell_order_id: int
-    instrument_code: str
-    price: float
-    amount: int
-    timestamp: datetime
-
 class OrderBook:
     """
     Maintains bids (buy orders) and asks (sell orders) for a specific instrument.
@@ -85,7 +73,7 @@ class OrderBook:
         while buy_order.amount > 0 and self.asks:
             best_ask = self.asks[0]
 
-            # For LIMIT, price must be >= best ask (the existing code checks MARKET vs. buy_order.price)
+            # For LIMIT order to proceed, limit price must be >= best ask
             if (buy_order.order_type == OrderType.LIMIT) and (best_ask.price - ERROR_TERM > buy_order.price):
                 break
 
@@ -95,7 +83,7 @@ class OrderBook:
             new_trade = Trade(
                 buy_order_id=buy_order.id,
                 sell_order_id=best_ask.id,
-                instrument_code=self.instrument.code,
+                instrument=self.instrument,
                 price=execution_price,
                 amount=matched_amount,
                 timestamp=datetime.now()
@@ -124,6 +112,7 @@ class OrderBook:
         while sell_order.amount > 0 and self.bids:
             best_bid = self.bids[0]
 
+            # For LIMIT order to proceed, limit price must be <= best bid
             if (sell_order.order_type == OrderType.LIMIT) and (best_bid.price + ERROR_TERM < sell_order.price):
                 break
 
@@ -133,7 +122,7 @@ class OrderBook:
             new_trade = Trade(
                 buy_order_id=best_bid.id,
                 sell_order_id=sell_order.id,
-                instrument_code=self.instrument.code,
+                instrument=self.instrument,
                 price=execution_price,
                 amount=matched_amount,
                 timestamp=datetime.now()
