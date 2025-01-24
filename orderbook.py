@@ -93,6 +93,7 @@ class OrderBook:
 
             matched_amount = min(buy_order.amount, best_ask.amount)
             execution_price = best_ask.price
+            match_timestamp = max(buy_order.timestamp, best_ask.timestamp)
 
             new_trade = Trade(
                 buy_order_id=buy_order.id,
@@ -100,7 +101,7 @@ class OrderBook:
                 instrument=self.instrument,
                 price=execution_price,
                 amount=matched_amount,
-                timestamp=datetime.now()
+                timestamp=match_timestamp
             )
             
             # Recording the trades in the global scope 
@@ -132,6 +133,7 @@ class OrderBook:
 
             matched_amount = min(sell_order.amount, best_bid.amount)
             execution_price = best_bid.price
+            match_timestamp = max(sell_order.timestamp, best_bid.timestamp)
 
             new_trade = Trade(
                 buy_order_id=best_bid.id,
@@ -139,7 +141,7 @@ class OrderBook:
                 instrument=self.instrument,
                 price=execution_price,
                 amount=matched_amount,
-                timestamp=datetime.now()
+                timestamp=match_timestamp
             )
 
             # Recording the trades in the global scope 
