@@ -23,22 +23,24 @@ class OrderFactory:
         self,
         instrument: Instrument,
         orderbook: OrderBook,
-        order_type: OrderType,
         arrivals_rate: float,  # Orders per second
         buy_ratio: float,
+        limit_order_ratio: float,
         min_consideration: int,
         max_amount: int,
         max_halfspread: float,
+        static_order_type: OrderType | None = None,
         static_midprice: float | None = None
     ) -> None:
         self.instrument = instrument
         self.orderbook = orderbook
-        self.order_type = order_type
         self.arrivals_rate = arrivals_rate
         self.buy_ratio = buy_ratio
+        self.limit_order_ratio = limit_order_ratio
         self.min_consideration = min_consideration
         self.max_amount = max_amount
         self.max_halfspread = max_halfspread
+        self.static_order_type = static_order_type
         self.static_midprice = static_midprice
 
     def _generate_counterpart_id(self) -> int:
@@ -53,6 +55,10 @@ class OrderFactory:
         # Randomly chooses BUY or SELL
         return OrderSide.BUY if random() < self.buy_ratio else OrderSide.SELL
 
+    def _genereate_order_type(self) -> OrderType:
+        # Randomly chooses LIMIT or MARKET
+        return OrderType.LIMIT if random() < self.limit_order_ratio else OrderType.MARKET
+
     def _generate_order_amount(self) -> int:
         # Generates an amount bounded by max_amount
         return min(math.ceil(expovariate(5 / self.max_amount)), self.max_amount)
@@ -65,14 +71,20 @@ class OrderFactory:
         limit_price = _round_up(midprice + midprice_offset, self.instrument.min_tick_size)
         return limit_price
 
-    def _generate_order(self) -> tuple[Order, float]:
+    def generate_order(self) -> tuple[Order, float]:
         # Creates a single order and its interarrival time
         order_counterpart_id = self._generate_counterpart_id()
         order_interarrival_time = self._generate_interval_time()
         order_side = self._generate_order_side()
         order_amount = self._generate_order_amount()
 
-        if self.order_type == OrderType.LIMIT:
+        # Assigining static order type, or drawing a random one if None is given
+        if self.static_order_type:
+            order_type = self.static_order_type
+        else:
+            order_type = self._genereate_order_type()
+
+        if order_type == OrderType.LIMIT:
             order_price = self._generate_order_price(order_amount, order_side)
         else:
             order_price = None
@@ -80,7 +92,7 @@ class OrderFactory:
         new_order = Order(
             counterpart_id=order_counterpart_id,
             instrument=self.instrument,
-            order_type=self.order_type,
+            order_type=order_type,
             side=order_side,
             amount=order_amount,
             price=order_price
@@ -94,7 +106,7 @@ class OrderFactory:
         order_list: list[Order] = []
 
         for _ in range(n_orders):
-            new_order, interarrival_time = self._generate_order()
+            new_order, interarrival_time = self.generate_order()
             new_order.add_timestamp(current_time)
             new_order.generate_id()
             order_list.append(new_order)
