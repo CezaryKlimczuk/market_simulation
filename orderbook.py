@@ -197,3 +197,6 @@ class OrderBook:
                     return True
 
         return False
+
+    def get_midprice(self) -> float:
+        return 0.5 * (self.bids[0].price + self.asks[0].price)
