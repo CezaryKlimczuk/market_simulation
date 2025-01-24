@@ -1,7 +1,6 @@
 from typing import Deque
 from datetime import datetime
 from collections import deque
-from dataclasses import dataclass
 
 from trade import Trade
 from instrument import Instrument
@@ -9,7 +8,7 @@ from order import Order, OrderType, OrderSide
 
 
 # Introduced to account for floating-point inaccuracy
-ERROR_TERM = 1e-9
+ERROR_TOLERANCE = 1e-9
 
 
 class OrderBook:
@@ -25,6 +24,18 @@ class OrderBook:
         self.asks: Deque[Order] = deque()
         self.trades: list[Trade] = []
 
+    def _validate_limit_price(self, incoming_order: Order) -> None:
+        """
+        Returns if 'price' is not a multiple of 'tick_size' within a
+        small epsilon tolerance to avoid floating-point rounding issues.
+        """
+        limit_price = incoming_order.price
+        tick_size = self.instrument.min_tick_size
+        error = abs(round(limit_price / tick_size) * tick_size - limit_price)
+        if error > ERROR_TOLERANCE:
+            raise ValueError(f"Limit price {limit_price} breaches the minimum tick size of {tick_size}")
+
+
     def add_order(self, incoming_order: Order) -> list[Trade]:
         """
         Main entry point: match incoming_order against the order book.
@@ -32,6 +43,9 @@ class OrderBook:
         """
         if incoming_order.instrument != self.instrument:
             raise ValueError("Incoming order instrument does not match this OrderBook.")
+
+        if incoming_order.order_type == OrderType.LIMIT:
+            self._validate_limit_price(incoming_order)
 
         if incoming_order.side == OrderSide.BUY:
             return self._match_buy_order(incoming_order)
@@ -74,7 +88,7 @@ class OrderBook:
             best_ask = self.asks[0]
 
             # For LIMIT order to proceed, limit price must be >= best ask
-            if (buy_order.order_type == OrderType.LIMIT) and (best_ask.price - ERROR_TERM > buy_order.price):
+            if (buy_order.order_type == OrderType.LIMIT) and (best_ask.price - ERROR_TOLERANCE > buy_order.price):
                 break
 
             matched_amount = min(buy_order.amount, best_ask.amount)
@@ -113,7 +127,7 @@ class OrderBook:
             best_bid = self.bids[0]
 
             # For LIMIT order to proceed, limit price must be <= best bid
-            if (sell_order.order_type == OrderType.LIMIT) and (best_bid.price + ERROR_TERM < sell_order.price):
+            if (sell_order.order_type == OrderType.LIMIT) and (best_bid.price + ERROR_TOLERANCE < sell_order.price):
                 break
 
             matched_amount = min(sell_order.amount, best_bid.amount)
