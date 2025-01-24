@@ -197,9 +197,3 @@ class OrderBook:
                     return True
 
         return False
-
-    def get_best_bid(self) -> Order:
-        return self.bids[0] if self.bids else None
-
-    def get_best_ask(self) -> Order:
-        return self.asks[0] if self.asks else None
