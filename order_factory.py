@@ -24,6 +24,7 @@ class OrderFactory:
         instrument: Instrument,
         orderbook: OrderBook, # The Orderbook object of associated Instrument
         arrivals_rate: float,  # Orders per second
+        hazard_rate: float, # Expected lifetime in seconds
         buy_ratio: float,
         limit_order_ratio: float,
         min_consideration: int,
@@ -35,6 +36,7 @@ class OrderFactory:
         self.instrument = instrument
         self.orderbook = orderbook
         self.arrivals_rate = arrivals_rate
+        self.hazard_rate = hazard_rate
         self.buy_ratio = buy_ratio
         self.limit_order_ratio = limit_order_ratio
         self.min_consideration = min_consideration
@@ -56,6 +58,14 @@ class OrderFactory:
         Currently drawn from an exponential distribution.
         """
         return expovariate(lambd=self.arrivals_rate)
+
+    def _generate_order_lifetime(self) -> float:
+        """
+        Draws lifetime of the order.
+        
+        Currently drawn from an exponential distribution.
+        """
+        return expovariate(lambd=self.hazard_rate)
 
     def _generate_order_side(self) -> float:
         """
@@ -114,13 +124,17 @@ class OrderFactory:
         else:
             order_price = None
 
-        # Generating the order timestamp based on previous order
-        # and a random interarrival time
+        # Generating the order timestamp based on previous order and a random interarrival time
         order_interarrival_time = self._generate_interval_time()
         order_timestamp = previous_order_ts + timedelta(seconds=order_interarrival_time)
 
+        # Generating the order cancellation timestamp based on the order lifetime
+        order_lifetime = self._generate_order_lifetime()
+        order_cancellation_timestamp = order_timestamp + timedelta(seconds=order_lifetime)
+
         new_order = Order(
             timestamp=order_timestamp,
+            cancellation_timestamp=order_cancellation_timestamp,
             counterpart_id=order_counterpart_id,
             instrument=self.instrument,
             order_type=order_type,

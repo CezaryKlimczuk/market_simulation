@@ -16,6 +16,7 @@ class OrderType(Enum):
 @dataclass
 class Order:
     timestamp: datetime
+    cancellation_timestamp: datetime
     counterpart_id: int
     instrument: Instrument
     order_type: OrderType
