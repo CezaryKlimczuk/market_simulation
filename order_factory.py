@@ -7,9 +7,11 @@ from instrument import Instrument
 from order import Order, OrderSide, OrderType
 
 
-def _round_up(x, a):
-    # Rounds x up to the nearest multiple of a
-    return float(round(x / a) * a)
+def _round_up(value: float, precision: float):
+    """
+    Rounds up the `value` to the nearest multiple of `precision`
+    """
+    return float(round(value / precision) * precision)
 
 
 class OrderFactory:
@@ -20,7 +22,7 @@ class OrderFactory:
     def __init__(
         self,
         instrument: Instrument,
-        orderbook: OrderBook,
+        orderbook: OrderBook, # The Orderbook object of associated Instrument
         arrivals_rate: float,  # Orders per second
         buy_ratio: float,
         limit_order_ratio: float,
@@ -42,27 +44,44 @@ class OrderFactory:
         self.static_midprice = static_midprice
 
     def _generate_counterpart_id(self) -> int:
-        # Draws a random counterpart id
+        """
+        Draws a random counterpart id for a given order.
+        """
         return randint(1000, 1010)
 
     def _generate_interval_time(self) -> float:
-        # Draws interarrival time from an exponential distribution
+        """
+        Draws interarrival time of the order.
+        
+        Currently drawn from an exponential distribution.
+        """
         return expovariate(lambd=self.arrivals_rate)
 
     def _generate_order_side(self) -> float:
-        # Randomly chooses BUY or SELL
+        """
+        Draws randomly a BUY or a SELL side based on the `buy_ratio` attribute.
+        """
         return OrderSide.BUY if random() < self.buy_ratio else OrderSide.SELL
 
     def _genereate_order_type(self) -> OrderType:
-        # Randomly chooses LIMIT or MARKET
+        """
+        Draws randomly a LIMIT or a MARKET type based on the `limit_order_ratio` attribute.
+        """
         return OrderType.LIMIT if random() < self.limit_order_ratio else OrderType.MARKET
 
     def _generate_order_amount(self) -> int:
-        # Generates an amount bounded by max_amount
+        """
+        Draws the order amount.
+
+        Currently drawn from the exponential distribution and
+        bounded by the `max_amount` attribute.
+        """
         return min(math.ceil(expovariate(5 / self.max_amount)), self.max_amount)
 
     def _generate_order_price(self, amount: int, side: OrderSide) -> float:
-        # Creates a limit price offset scaled by order size
+        """
+        Draws the order price for a LIMIT order.
+        """
         midprice_offset = uniform(0, self.max_halfspread * amount / self.max_amount)
         midprice_offset = midprice_offset if side == OrderSide.SELL else -midprice_offset
         midprice = self.static_midprice if self.static_midprice else self.orderbook.get_midprice()
@@ -70,7 +89,10 @@ class OrderFactory:
         return limit_price
 
     def generate_order(self) -> tuple[Order, float]:
-        # Creates a single order and its interarrival time
+        """
+        Generates a single instance of Order along with its 
+        interarrival time.
+        """
         order_counterpart_id = self._generate_counterpart_id()
         order_interarrival_time = self._generate_interval_time()
         order_side = self._generate_order_side()
@@ -99,7 +121,9 @@ class OrderFactory:
         return (new_order, order_interarrival_time)
 
     def generate_orders(self, start_time: datetime, n_orders: int) -> list[Order]:
-        # Produces a list of orders, each timestamped based on Poisson intervals
+        """
+        Generates a list of Order instances with assigned timestamps and ids.
+        """
         current_time = start_time
         order_list: list[Order] = []
 
