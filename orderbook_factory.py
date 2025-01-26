@@ -1,5 +1,3 @@
-import numpy as np
-
 import math
 from datetime import datetime, timedelta
 from random import expovariate, random, uniform, randint
@@ -11,7 +9,7 @@ from order import Order, OrderSide, OrderType
 
 def _round_up(x, a):
     # Rounds x up to the nearest multiple of a
-    return float(np.ceil(x / a) * a)
+    return float(round(x / a) * a)
 
 
 class OrderFactory:
