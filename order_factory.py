@@ -94,13 +94,11 @@ class OrderFactory:
         limit_price = _round_up(midprice + midprice_offset, self.instrument.min_tick_size)
         return limit_price
 
-    def generate_order(self) -> tuple[Order, float]:
+    def generate_order(self, previous_order_ts: datetime) -> Order:
         """
-        Generates a single instance of Order along with its 
-        interarrival time.
+        Generates a single instance of Order class
         """
         order_counterpart_id = self._generate_counterpart_id()
-        order_interarrival_time = self._generate_interval_time()
         order_side = self._generate_order_side()
         order_amount = self._generate_order_amount()
 
@@ -110,12 +108,19 @@ class OrderFactory:
         else:
             order_type = self._genereate_order_type()
 
+        # Generating the price if the order type is LIMIT
         if order_type == OrderType.LIMIT:
             order_price = self._generate_order_price(order_amount, order_side)
         else:
             order_price = None
 
+        # Generating the order timestamp based on previous order
+        # and a random interarrival time
+        order_interarrival_time = self._generate_interval_time()
+        order_timestamp = previous_order_ts + timedelta(seconds=order_interarrival_time)
+
         new_order = Order(
+            timestamp=order_timestamp,
             counterpart_id=order_counterpart_id,
             instrument=self.instrument,
             order_type=order_type,
@@ -124,20 +129,18 @@ class OrderFactory:
             price=order_price
         )
 
-        return (new_order, order_interarrival_time)
+        return new_order
 
     def generate_orders(self, start_time: datetime, n_orders: int) -> list[Order]:
         """
         Generates a list of Order instances with assigned timestamps and ids.
         """
-        current_time = start_time
+        previous_order_time = start_time
         order_list: list[Order] = []
 
         for _ in range(n_orders):
-            new_order, interarrival_time = self.generate_order()
-            new_order.add_timestamp(current_time)
-            new_order.generate_id()
+            new_order = self.generate_order(previous_order_ts=previous_order_time)
             order_list.append(new_order)
-            current_time += timedelta(seconds=interarrival_time)
+            previous_order_time = new_order.timestamp
 
         return order_list
