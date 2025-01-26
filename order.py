@@ -15,6 +15,7 @@ class OrderType(Enum):
 
 @dataclass
 class Order:
+    timestamp: datetime
     counterpart_id: int
     instrument: Instrument
     order_type: OrderType
@@ -22,10 +23,5 @@ class Order:
     amount: int
     price: float | None
 
-
-    def add_timestamp(self, timestamp: datetime) -> None:
-        # Allows adding a timestamp after instantiation
-        self.timestamp = timestamp
-
-    def generate_id(self) -> None:
+    def __post_init__(self):
         self.id = hash(self.__str__())
