@@ -19,7 +19,6 @@ class OrderBook:
 
     def __init__(self, instrument: Instrument) -> None:
         self.instrument: Instrument = instrument
-        # Storing Order objects within bids and asks queues
         self.bids: Deque[Order] = deque()
         self.asks: Deque[Order] = deque()
         self.trades: list[Trade] = []
@@ -53,6 +52,10 @@ class OrderBook:
             return self._match_sell_order(incoming_order)
 
     def _match_buy_order(self, buy_order: Order) -> list[Trade]:
+        """
+        A function performing liquidity checks, executing Trades vs the orderbook
+        and insterting any leftover limit buys into the book.
+        """
         trades: list[Trade] = []
         # MARKET buy => check liquidity first
         if buy_order.order_type == OrderType.MARKET:
@@ -68,6 +71,10 @@ class OrderBook:
         return trades
 
     def _match_sell_order(self, sell_order: Order) -> list[Trade]:
+        """
+        A function performing liquidity checks, executing Trades vs the orderbook
+        and insterting any leftover limit sells into the book.
+        """
         trades: list[Trade] = []
         # MARKET sell => check liquidity
         if sell_order.order_type == OrderType.MARKET:
@@ -83,6 +90,10 @@ class OrderBook:
         return trades
 
     def _execute_buy_matches(self, buy_order: Order) -> list[Trade]:
+        """
+        A loop searching for tradeable ask prices and creating Trade objects
+        of partial fills.
+        """
         trades: list[Trade] = []
         while buy_order.amount > 0 and self.asks:
             best_ask = self.asks[0]
@@ -123,6 +134,10 @@ class OrderBook:
         return trades
 
     def _execute_sell_matches(self, sell_order: Order) -> list[Trade]:
+        """
+        A loop searching for tradeable bid prices and creating Trade objects
+        of partial fills.
+        """
         trades: list[Trade] = []
         while sell_order.amount > 0 and self.bids:
             best_bid = self.bids[0]
@@ -162,6 +177,12 @@ class OrderBook:
         return trades
 
     def _insert_bid(self, order: Order) -> None:
+        """
+        A naiive implementation of inserting a limit bid order following
+        price, time priority.
+
+        TODO: Could use insort for O(log(n)) performance
+        """
         # Higher price => earlier in the list, tie -> FIFO
         inserted = False
         for i, existing_order in enumerate(self.bids):
@@ -173,6 +194,12 @@ class OrderBook:
             self.bids.append(order)
 
     def _insert_ask(self, order: Order) -> None:
+        """
+        A naiive implementation of inserting a limit ask order following
+        price, time priority.
+
+        TODO: Could use insort for O(log(n)) performance
+        """
         # Lower price => earlier in the list, tie -> FIFO
         inserted = False
         for i, existing_order in enumerate(self.asks):
@@ -184,6 +211,10 @@ class OrderBook:
             self.asks.append(order)
 
     def _has_sufficient_liquidity(self, incoming_order: Order, side: str) -> bool:
+        """
+        For incoming MARKET orders, check if the book has sufficient liquitdity
+        to fill the order in full.
+        """
         total_liquidity = 0
         needed = incoming_order.amount
 
@@ -201,11 +232,14 @@ class OrderBook:
         return False
 
     def get_midprice(self) -> float:
+        """
+        Returns the orderbook midprice.
+        """
         return 0.5 * (self.bids[0].price + self.asks[0].price)
 
     def remove_stale_quotes(self, current_time: datetime, lifetime_seconds: int) -> None:
         """
-        Removes quotes from the orderbook older than `lifetime_seconds`
+        Removes quotes from the orderbook older than `lifetime_seconds`.
         """
-        self.bids = [order for order in self.bids if order.timestamp > current_time - timedelta(seconds=lifetime_seconds)]
-        self.asks = [order for order in self.asks if order.timestamp > current_time - timedelta(seconds=lifetime_seconds)]
+        self.bids = deque([order for order in self.bids if order.timestamp > current_time - timedelta(seconds=lifetime_seconds)])
+        self.asks = deque([order for order in self.asks if order.timestamp > current_time - timedelta(seconds=lifetime_seconds)])
