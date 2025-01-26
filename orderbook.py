@@ -237,6 +237,12 @@ class OrderBook:
         """
         return 0.5 * (self.bids[0].price + self.asks[0].price)
 
+    def get_spread(self) -> float:
+        """
+        Returns the top-of-book spread.
+        """
+        return self.asks[0].price - self.bids[0].price
+
     def remove_stale_quotes(self, current_time: datetime, lifetime_seconds: int) -> None:
         """
         Removes quotes from the orderbook older than `lifetime_seconds`.
