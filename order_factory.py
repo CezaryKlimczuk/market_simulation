@@ -24,7 +24,7 @@ class OrderFactory:
         instrument: Instrument,
         orderbook: OrderBook, # The Orderbook object of associated Instrument
         arrivals_rate: float,  # Orders per second
-        hazard_rate: float, # Expected lifetime in seconds
+        hazard_rate: float, # Cancellation rate per second
         buy_ratio: float,
         limit_order_ratio: float,
         min_consideration: int,
