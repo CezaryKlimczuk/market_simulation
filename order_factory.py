@@ -30,7 +30,6 @@ class OrderFactory:
         min_consideration: int,
         max_amount: int,
         max_halfspread: float,
-        static_order_type: OrderType | None = None,
         static_midprice: float | None = None
     ) -> None:
         self.instrument = instrument
@@ -110,12 +109,6 @@ class OrderFactory:
         """
         order_counterpart_id = self._generate_counterpart_id()
         order_side = self._generate_order_side()
-        order_amount = self._generate_order_amount()
-
-        # Assigining static order type, or drawing a random one if None is given
-        if self.static_order_type:
-            order_type = self.static_order_type
-        else:
             order_type = self._genereate_order_type()
 
         # Generating the price if the order type is LIMIT
