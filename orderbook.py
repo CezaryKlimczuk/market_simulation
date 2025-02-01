@@ -21,6 +21,7 @@ class OrderBook:
         self.instrument: Instrument = instrument
         self.bids: Deque[Order] = deque()
         self.asks: Deque[Order] = deque()
+        self.order_registry: list[Order] = list()
         self.trades: list[Trade] = []
 
     def _validate_limit_price(self, incoming_order: Order) -> None:
@@ -122,11 +123,10 @@ class OrderBook:
             buy_order.amount -= matched_amount
             best_ask.amount -= matched_amount
 
-            # If the best ask is fully filled, pop it. Otherwise update its remaining amount in place.
+            # If the best ask is fully filled, remove it from asks and order registry.
             if best_ask.amount == 0:
                 self.asks.popleft()
-            else:
-                self.asks[0] = best_ask
+                self.order_registry.remove(best_ask)
 
             if buy_order.amount == 0:
                 break
@@ -166,10 +166,10 @@ class OrderBook:
             sell_order.amount -= matched_amount
             best_bid.amount -= matched_amount
 
+            # If the best bid is fully filled, remove it from bids and order registry.
             if best_bid.amount == 0:
                 self.bids.popleft()
-            else:
-                self.bids[0] = best_bid
+                self.order_registry.remove(best_bid)
 
             if sell_order.amount == 0:
                 break
@@ -193,6 +193,9 @@ class OrderBook:
         if not inserted:
             self.bids.append(order)
 
+        self._insert_into_order_registry(order)
+
+
     def _insert_ask(self, order: Order) -> None:
         """
         A naiive implementation of inserting a limit ask order following
@@ -209,6 +212,25 @@ class OrderBook:
                 break
         if not inserted:
             self.asks.append(order)
+
+        self._insert_into_order_registry(order)
+
+    def _insert_into_order_registry(self, order: Order) -> None:
+        """
+        Inserting orders into the `order_registry` based on their expected
+        cancellation time. 
+        
+        This is to optimise the order cancellation process
+        in the simulation environment.
+        """
+        inserted_reg = False
+        for i, existing in enumerate(self.order_registry):
+            if existing.cancellation_timestamp > order.cancellation_timestamp:
+                self.order_registry.insert(i, order)
+                inserted_reg = True
+                break
+        if not inserted_reg:
+            self.order_registry.append(order)
 
     def _has_sufficient_liquidity(self, incoming_order: Order, side: str) -> bool:
         """
@@ -236,6 +258,34 @@ class OrderBook:
         Returns the orderbook midprice.
         """
         return 0.5 * (self.bids[0].price + self.asks[0].price)
+
+    def get_spread(self) -> float:
+        """
+        Returns the top-of-book spread.
+        """
+        return self.asks[0].price - self.bids[0].price
+
+    def perform_order_cancellations(self, current_timestamp: datetime) -> None:
+        while True:
+            # Exit if no more orders in the registry
+            if not self.order_registry:
+                break
+
+            # The orders are sorted by cancellation time, so grab the earliest one
+            next_order = self.order_registry[0]
+
+            # If the order should be removed, remove it from the order registry and from the bid/ask queue
+            if next_order.cancellation_timestamp < current_timestamp:
+                self.order_registry.remove(next_order)
+
+                if next_order.side == OrderSide.BUY:
+                    self.bids.remove(next_order)
+                elif next_order.side == OrderSide.SELL:
+                    self.asks.remove(next_order)
+
+            # Stop if the earliest order shouldn't be removed yet.
+            else:
+                break
 
     def remove_stale_quotes(self, current_time: datetime, lifetime_seconds: int) -> None:
         """
