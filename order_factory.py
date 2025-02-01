@@ -19,6 +19,8 @@ class OrderFactory:
     Generates orders for a given instrument at Poisson-distributed intervals.
     """
 
+    AMOUNT_MULTIPLE = 5
+
     def __init__(
         self,
         instrument: Instrument,
@@ -28,7 +30,8 @@ class OrderFactory:
         buy_ratio: float,
         limit_order_ratio: float,
         min_consideration: int,
-        max_amount: int,
+        limit_amount_lambda: float,
+        market_amount_lambda: float,
         max_halfspread: float,
         static_midprice: float | None = None
     ) -> None:
@@ -39,9 +42,9 @@ class OrderFactory:
         self.buy_ratio = buy_ratio
         self.limit_order_ratio = limit_order_ratio
         self.min_consideration = min_consideration
-        self.max_amount = max_amount
+        self.limit_amount_lambda = limit_amount_lambda
+        self.market_amount_lambda = market_amount_lambda
         self.max_halfspread = max_halfspread
-        self.static_order_type = static_order_type
         self.static_midprice = static_midprice
 
     def _generate_counterpart_id(self) -> int:
@@ -78,14 +81,17 @@ class OrderFactory:
         """
         return OrderType.LIMIT if random() < self.limit_order_ratio else OrderType.MARKET
 
-    def _generate_order_amount(self) -> int:
+    def _generate_order_amount(self, order_type: OrderType) -> int:
         """
         Draws the order amount.
 
         Currently drawn from the exponential distribution and
         bounded by the `max_amount` attribute.
         """
-        return min(math.ceil(expovariate(5 / self.max_amount)), self.max_amount)
+        if order_type == OrderType.LIMIT:
+            return min(math.ceil(expovariate(self.limit_amount_lambda)), self.AMOUNT_MULTIPLE / self.limit_amount_lambda)
+        elif order_type == OrderType.MARKET:
+            return min(math.ceil(expovariate(self.market_amount_lambda)), self.AMOUNT_MULTIPLE / self.market_amount_lambda)
 
     def _generate_order_price(self, amount: int, side: OrderSide) -> float:
         """
@@ -95,7 +101,7 @@ class OrderFactory:
         midprice = self.static_midprice if self.static_midprice else self.orderbook.get_midprice()
 
         # The amount of an order influences how far from the mid the price can be
-        max_offset = self.max_halfspread * amount / self.max_amount
+        max_offset = self.max_halfspread * amount / (self.AMOUNT_MULTIPLE / self.limit_amount_lambda)
         midprice_offset = uniform(0, max_offset)
 
         # Ensuring the limit order adds liquidity to the book 
@@ -112,6 +118,7 @@ class OrderFactory:
         order_counterpart_id = self._generate_counterpart_id()
         order_side = self._generate_order_side()
         order_type = self._genereate_order_type()
+        order_amount = self._generate_order_amount(order_type=order_type)
 
         # Generating the price if the order type is LIMIT
         if order_type == OrderType.LIMIT:
