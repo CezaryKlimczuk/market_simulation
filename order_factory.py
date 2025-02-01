@@ -91,6 +91,9 @@ class OrderFactory:
         """
         Draws the order price for a LIMIT order.
         """
+        # Fetching the midprice and generating the limit price
+        midprice = self.static_midprice if self.static_midprice else self.orderbook.get_midprice()
+
         # The amount of an order influences how far from the mid the price can be
         max_offset = self.max_halfspread * amount / self.max_amount
         midprice_offset = uniform(0, max_offset)
@@ -98,8 +101,7 @@ class OrderFactory:
         # Ensuring the limit order adds liquidity to the book 
         midprice_offset = midprice_offset if side == OrderSide.SELL else -midprice_offset
 
-        # Fetching the midprice and generating the limit price
-        midprice = self.static_midprice if self.static_midprice else self.orderbook.get_midprice()
+        # Rounding the midprice to the nearest tick size
         limit_price = _round_up(midprice + midprice_offset, self.instrument.min_tick_size)
         return limit_price
 
@@ -109,7 +111,7 @@ class OrderFactory:
         """
         order_counterpart_id = self._generate_counterpart_id()
         order_side = self._generate_order_side()
-            order_type = self._genereate_order_type()
+        order_type = self._genereate_order_type()
 
         # Generating the price if the order type is LIMIT
         if order_type == OrderType.LIMIT:
