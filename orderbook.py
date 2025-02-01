@@ -123,11 +123,10 @@ class OrderBook:
             buy_order.amount -= matched_amount
             best_ask.amount -= matched_amount
 
-            # If the best ask is fully filled, pop it. Otherwise update its remaining amount in place.
+            # If the best ask is fully filled, remove it from asks and order registry.
             if best_ask.amount == 0:
                 self.asks.popleft()
-            else:
-                self.asks[0] = best_ask
+                self.order_registry.remove(best_ask)
 
             if buy_order.amount == 0:
                 break
@@ -167,10 +166,10 @@ class OrderBook:
             sell_order.amount -= matched_amount
             best_bid.amount -= matched_amount
 
+            # If the best bid is fully filled, remove it from bids and order registry.
             if best_bid.amount == 0:
                 self.bids.popleft()
-            else:
-                self.bids[0] = best_bid
+                self.order_registry.remove(best_bid)
 
             if sell_order.amount == 0:
                 break
