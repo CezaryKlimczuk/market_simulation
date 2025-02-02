@@ -7,7 +7,7 @@ This project provides a **high-level simulation** of a continuous-limit order bo
 ## Overview
 
 1. **Purely Stochastic Price Formation** 
-   - New orders (both **buys** and **sells**) arrive according to **Poisson processes**, parameterized by an arrival rate ($\lambda$).  
+   - New orders (both **buys** and **sells**) arrive according to **Poisson processes**, parameterized by an arrival rate ($\gamma$).  
    - Each order can be either **limit** or **market**, with probabilities set by a configurable ratio ($\rho$).  
    - There is no continuous “true” midprice feeding the simulation. Instead, the **limit orders** collectively create a **range** of possible trading prices, and market orders interact within that range.
 
@@ -21,11 +21,13 @@ This project provides a **high-level simulation** of a continuous-limit order bo
    - When the order’s lifetime ends, it is removed from the book if it hasn’t already executed. This keeps the simulated order book dynamic, constantly adding new orders and removing old ones.
 
 4. **Parameter Tuning**  
-   - **Arrival Rate** ($\lambda$): How frequently new orders are generated.  
+   - **Arrival Rate** ($\gamma$): How frequently new orders are generated.  
    - **Hazard Rate** ($\mu$): Governs the typical lifetime of orders.  
    - **Buy-to-Sell Ratio** ($\beta$): Proportion of buy orders vs. sell orders.  
    - **Limit-to-Market Ratio** ($\rho$): The chance that a new order is a limit order rather than a market order.  
-   - **Amount Distributions**: Controlled by exponential parameters, determining typical order sizes.
+   - **Limit order exponential factor** ($\lambda_L$): Determines the shape of the exponentaial function for limit order amounts.
+   - **Market order exponential factor** ($\lambda_M$): Determines the shape of the exponentaial function for market order amounts.
+   - **Maximum halfspread** ($\sigma$): Caps the maximum spread-to-mid at which limit orders can be submitted
 
 5. **Why Use It**  
    - Offers a **lightweight** way to see how an order book evolves **without** external price quotes.  

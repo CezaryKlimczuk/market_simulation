@@ -256,6 +256,8 @@ class OrderBook:
     def get_midprice(self) -> float:
         """
         Returns the orderbook midprice.
+
+        TODO: How to handle empty orderbooks?
         """
         return 0.5 * (self.bids[0].price + self.asks[0].price)
 
