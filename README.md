@@ -33,6 +33,62 @@ This project provides a **high-level simulation** of a continuous-limit order bo
    - Offers a **lightweight** way to see how an order book evolves **without** external price quotes.  
    - Ideal for experimenting with different arrival intensities, order sizes, or cancellation dynamics, and observing **emergent** price formation.
 
----
 
 This project ultimately demonstrates how an **order-driven market** can generate its own simulated prices through the **random arrivals** and **executions** of buy and sell orders, providing a purely **endogenous** perspective on price discovery.
+
+---
+
+## Setup guide
+
+Follow these steps to set up your project with uv:
+
+1. **Install uv**
+
+   Choose one of the following installation methods. For more installation options, refer to the [uv installation documentation](https://github.com/astral-sh/uv/blob/main/docs/getting-started/installation.md).
+
+   - **Standalone Installer:**
+
+     For macOS and Linux:
+     ```sh
+     curl -LsSf https://astral.sh/uv/install.sh | sh
+     ```
+
+   -  **For Windows:**
+
+      ```powershell
+       powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+      ```
+
+
+   - **Using pip:**
+     ```sh
+     pip install uv
+     ```
+
+   - **Using pipx:**
+     ```sh
+     pipx install uv
+     ```
+
+2. **Clone the Repository**
+
+   Replace `<repository_url>` with your repository's URL:
+
+   ```sh
+   git clone <repository_url>
+   cd <repository_name>
+   ```
+
+3. **Synchronize Dependencies**
+
+   In the project directory, run:
+
+   ```sh
+   uv sync
+   ```
+
+   This command will install all necessary dependencies as specified in your `pyproject.toml` or `uv.lock` file.
+
+4. **All set!**
+   Give it a go and let me know what you think.
+
