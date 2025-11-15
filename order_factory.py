@@ -1,4 +1,5 @@
 import math
+from typing import Protocol
 from datetime import datetime, timedelta
 from random import expovariate, random, uniform, randint
 
@@ -12,6 +13,36 @@ def _round_up(value: float, precision: float):
     Rounds up the `value` to the nearest multiple of `precision`
     """
     return float(round(value / precision) * precision)
+
+
+class OrderPriceGenerator(Protocol):
+    def generate_price(self, order_side: OrderSide, amount: int, midprice: float) -> float:
+        ...
+
+class PassivePriceGenerator:
+    def __init__(
+        self, 
+        instrument: Instrument,
+        max_halfspread: float,
+        amount_multiple: int,
+        limit_amount_lambda: float,
+    ) -> None:
+        self.instrument = instrument
+        self.max_halfspread = max_halfspread
+        self.amount_multiple = amount_multiple
+        self.limit_amount_lambda = limit_amount_lambda
+
+    def generate_price(self, order_side: OrderSide, amount: int, midprice: float) -> float:
+        # The amount of an order influences how far from the mid the price can be
+        max_offset = self.max_halfspread * amount / (self.amount_multiple / self.limit_amount_lambda)
+        midprice_offset = uniform(0, max_offset)
+
+        # Ensuring the limit order adds liquidity to the book 
+        midprice_offset = midprice_offset if order_side == OrderSide.SELL else -midprice_offset
+
+        # Rounding the midprice to the nearest tick size
+        passive_price = _round_up(midprice + midprice_offset, self.instrument.min_tick_size)
+        return passive_price
 
 
 class OrderFactory:
@@ -32,7 +63,7 @@ class OrderFactory:
         min_consideration: int,
         limit_amount_lambda: float,
         market_amount_lambda: float,
-        max_halfspread: float,
+        price_generator: OrderPriceGenerator,
         static_midprice: float | None = None
     ) -> None:
         self.instrument = instrument
@@ -44,7 +75,7 @@ class OrderFactory:
         self.min_consideration = min_consideration
         self.limit_amount_lambda = limit_amount_lambda
         self.market_amount_lambda = market_amount_lambda
-        self.max_halfspread = max_halfspread
+        self.price_generator = price_generator
         self.static_midprice = static_midprice
 
     def _generate_counterpart_id(self) -> int:
@@ -93,24 +124,6 @@ class OrderFactory:
         elif order_type == OrderType.MARKET:
             return min(math.ceil(expovariate(self.market_amount_lambda)), self.AMOUNT_MULTIPLE / self.market_amount_lambda)
 
-    def _generate_order_price(self, amount: int, side: OrderSide) -> float:
-        """
-        Draws the order price for a LIMIT order.
-        """
-        # Fetching the midprice and generating the limit price
-        midprice = self.static_midprice if self.static_midprice else self.orderbook.get_midprice()
-
-        # The amount of an order influences how far from the mid the price can be
-        max_offset = self.max_halfspread * amount / (self.AMOUNT_MULTIPLE / self.limit_amount_lambda)
-        midprice_offset = uniform(0, max_offset)
-
-        # Ensuring the limit order adds liquidity to the book 
-        midprice_offset = midprice_offset if side == OrderSide.SELL else -midprice_offset
-
-        # Rounding the midprice to the nearest tick size
-        limit_price = _round_up(midprice + midprice_offset, self.instrument.min_tick_size)
-        return limit_price
-
     def generate_order(self, previous_order_ts: datetime) -> Order:
         """
         Generates a single instance of Order class
@@ -122,7 +135,8 @@ class OrderFactory:
 
         # Generating the price if the order type is LIMIT
         if order_type == OrderType.LIMIT:
-            order_price = self._generate_order_price(order_amount, order_side)
+            midprice = self.static_midprice if self.static_midprice else self.orderbook.get_midprice()
+            order_price = self.price_generator.generate_price(order_side=order_side, amount=order_amount, midprice=midprice)
         else:
             order_price = None
 
